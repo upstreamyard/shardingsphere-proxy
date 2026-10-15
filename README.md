@@ -20,7 +20,7 @@ Multi-arch (`amd64`, `arm64`), signed container images for [Apache ShardingSpher
 | Requires | your MySQL, MariaDB or PostgreSQL databases (tested: MySQL 8.4, MariaDB 11.4, PostgreSQL 17). For more than one proxy instance: ZooKeeper |
 | Config | YAML files in `/opt/shardingsphere-proxy/conf` (`global.yaml`, `database-*.yaml`) |
 | Drivers | MySQL Connector/J 26.7.0 (added by us), PostgreSQL and openGauss (part of the ShardingSphere release) |
-| Runs as | non-root UID `10001`; works with a read-only root filesystem |
+| Runs as | non-root UID `10001`; works with a read-only root filesystem (XA transactions need a writable `/opt/shardingsphere-proxy/logs`) |
 | Java | Eclipse Temurin 25 JRE on Ubuntu 24.04; heap is 80% of the container's memory limit |
 | Default users | **none configured means `root`/`root` as admin from any host** (ShardingSphere's default). Always configure `authority` users; the container logs a warning otherwise |
 
@@ -158,7 +158,7 @@ Running it yourself:
 4. Set a memory limit; the heap is 80% of it.
 5. On `SIGTERM` the proxy exits within a second and closes open client connections, so add a short `preStop` sleep to let the Service stop sending new connections first.
 
-The container works with `runAsNonRoot: true`, `readOnlyRootFilesystem: true` (with an `emptyDir` at `/tmp`) and all capabilities dropped.
+The container works with `runAsNonRoot: true`, `readOnlyRootFilesystem: true` and all capabilities dropped. With a read-only root filesystem, mount writable volumes at `/tmp` and, for XA transactions (Atomikos writes its transaction log there), at `/opt/shardingsphere-proxy/logs`.
 
 ## Verifying images
 

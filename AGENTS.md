@@ -11,7 +11,7 @@ Instructions for AI agents and coding assistants working with this repository or
 | Platforms | `linux/amd64`, `linux/arm64` |
 | Port | `3307`: MySQL protocol, or PostgreSQL protocol when the backends are PostgreSQL |
 | Probe | TCP on the port (built-in `HEALTHCHECK` uses `healthcheck`) |
-| User | non-root, UID/GID `10001`; read-only root filesystem works (writable `/tmp` recommended) |
+| User | non-root, UID/GID `10001`; read-only root filesystem works with writable `/tmp` and, for XA transactions, `/opt/shardingsphere-proxy/logs` (Atomikos transaction log) |
 | Entrypoint | `tini -- docker-entrypoint.sh`; arguments starting with `-` go to ShardingSphere's `start.sh`, anything else is run as a command |
 | Config | YAML files in `/opt/shardingsphere-proxy/conf`: `global.yaml` (users, mode, props) and `database-*.yaml` (data sources, rules) |
 | Environment | `PORT`, `CONF_DIR`, `JVM_OPTS`, `CGROUP_MEM_OPTS` (heap: 80% of the memory limit by default) |
