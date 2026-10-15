@@ -1,0 +1,34 @@
+# ShardingSphere-Proxy in front of MySQL, with the example in examples/mysql-sharding:
+# table t_order of the logical database sharding_db is split across the MySQL databases
+# ds_0 and ds_1. Start with: docker compose up -d
+# Then connect: mysql -h 127.0.0.1 -P 3307 -u app -pchange-me-too sharding_db
+services:
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpw
+      MYSQL_DATABASE: ds_0
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./examples/mysql-init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      # TCP only: MySQL's first-start initialization runs without networking.
+      test: ["CMD-SHELL", "mysql -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD -e 'USE ds_1'"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  shardingsphere-proxy:
+    image: upstreamyard/shardingsphere-proxy:5.5
+    restart: unless-stopped
+    ports:
+      - "3307:3307"
+    volumes:
+      - ./examples/mysql-sharding:/opt/shardingsphere-proxy/conf:ro
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+volumes:
+  mysql_data:

@@ -1,0 +1,38 @@
+# A logical database "sharding_db" whose table t_order is split by user_id
+# across two MySQL databases (ds_0 and ds_1).
+databaseName: sharding_db
+
+dataSources:
+  ds_0:
+    url: jdbc:mysql://mysql:3306/ds_0?sslMode=REQUIRED
+    username: root
+    password: rootpw
+    connectionTimeoutMilliseconds: 30000
+    idleTimeoutMilliseconds: 60000
+    maxLifetimeMilliseconds: 1800000
+    maxPoolSize: 20
+    minPoolSize: 1
+  ds_1:
+    url: jdbc:mysql://mysql:3306/ds_1?sslMode=REQUIRED
+    username: root
+    password: rootpw
+    connectionTimeoutMilliseconds: 30000
+    idleTimeoutMilliseconds: 60000
+    maxLifetimeMilliseconds: 1800000
+    maxPoolSize: 20
+    minPoolSize: 1
+
+rules:
+  - !SHARDING
+    tables:
+      t_order:
+        actualDataNodes: ds_${0..1}.t_order
+        databaseStrategy:
+          standard:
+            shardingColumn: user_id
+            shardingAlgorithmName: by_user_id
+    shardingAlgorithms:
+      by_user_id:
+        type: INLINE
+        props:
+          algorithm-expression: ds_${user_id % 2}

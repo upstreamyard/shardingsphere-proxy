@@ -1,0 +1,25 @@
+# Cluster mode: several proxies share their configuration through ZooKeeper.
+mode:
+  type: Cluster
+  repository:
+    type: ZooKeeper
+    props:
+      namespace: shardingsphere
+      server-lists: zookeeper:2181
+      retryIntervalMilliseconds: 500
+      timeToLiveSeconds: 60
+      maxRetries: 3
+      operationTimeoutMilliseconds: 500
+
+authority:
+  users:
+    - user: admin@%
+      password: change-me
+      admin: true
+    - user: app@%
+      password: change-me-too
+  privilege:
+    type: ALL_PERMITTED
+
+props:
+  sql-show: false
