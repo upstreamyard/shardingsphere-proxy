@@ -82,7 +82,7 @@ jobs:
       DOCKERHUB_ENABLED: ${{ secrets.DOCKERHUB_TOKEN != '' }}
       QUAY_ENABLED: ${{ secrets.QUAY_TOKEN != '' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Download and verify ShardingSphere ${{ env.VERSION }}
         run: scripts/fetch-release.sh "$VERSION"
