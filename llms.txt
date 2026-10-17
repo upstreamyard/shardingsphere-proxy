@@ -1,0 +1,29 @@
+# upstreamyard/shardingsphere-proxy
+
+> Multi-arch (amd64, arm64), cosign-signed container image for Apache ShardingSphere-Proxy, a database proxy for sharding, read/write splitting, encryption and masking in front of MySQL, MariaDB and PostgreSQL, with the MySQL JDBC driver included. Community-maintained by upstreamyard; not an official Apache image. Pull `upstreamyard/shardingsphere-proxy:<version>` or `ghcr.io/upstreamyard/shardingsphere-proxy:<version>`. Listens on port 3307 (MySQL or PostgreSQL protocol).
+
+Key facts: configured by YAML files in `/opt/shardingsphere-proxy/conf` (`global.yaml` for users, mode and props; `database-*.yaml` for data sources and rules). Always configure `authority.users`, otherwise `root`/`root` is accepted. MySQL and MariaDB URLs need `sslMode=REQUIRED`. Standalone mode (default) reads the files on every start; Cluster mode with ZooKeeper shares configuration between instances and uses the files only on the first start per namespace. Probe: TCP 3307. Non-root UID 10001, read-only root filesystem works.
+
+## Docs
+
+- [README](https://raw.githubusercontent.com/upstreamyard/shardingsphere-proxy/main/README.md): quick start, configuration, modes, Kubernetes notes, licences, image verification
+- [AGENTS.md](https://raw.githubusercontent.com/upstreamyard/shardingsphere-proxy/main/AGENTS.md): image facts table, deployment rules, repository conventions
+
+## Examples
+
+- [docker-compose.yml](https://raw.githubusercontent.com/upstreamyard/shardingsphere-proxy/main/docker-compose.yml): the proxy in front of MySQL with a sharded table
+- [examples/mysql-sharding](https://github.com/upstreamyard/shardingsphere-proxy/tree/main/examples/mysql-sharding): Standalone config, one table split across two MySQL databases
+- [examples/cluster-zookeeper](https://github.com/upstreamyard/shardingsphere-proxy/tree/main/examples/cluster-zookeeper): Cluster mode config with ZooKeeper
+- [Helm chart](https://raw.githubusercontent.com/upstreamyard/helm-charts/main/charts/shardingsphere-proxy/README.md): recommended for Kubernetes; `helm repo add upstreamyard https://upstreamyard.github.io/helm-charts`
+
+## ShardingSphere project
+
+- [ShardingSphere repository](https://github.com/apache/shardingsphere): source, issues, discussions
+- [Proxy YAML configuration](https://shardingsphere.apache.org/document/current/en/user-manual/shardingsphere-proxy/yaml-config/): global settings, data sources and all rules
+- [DistSQL](https://shardingsphere.apache.org/document/current/en/user-manual/shardingsphere-proxy/distsql/): ShardingSphere's admin SQL
+
+## Optional
+
+- [Build workflow](https://raw.githubusercontent.com/upstreamyard/shardingsphere-proxy/main/.github/workflows/build.yml): how images are built, tested, signed and published
+- [Dockerfile](https://raw.githubusercontent.com/upstreamyard/shardingsphere-proxy/main/Dockerfile)
+- [Smoke test](https://raw.githubusercontent.com/upstreamyard/shardingsphere-proxy/main/scripts/smoke-test.sh)

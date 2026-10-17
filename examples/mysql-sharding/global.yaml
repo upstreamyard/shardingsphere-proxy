@@ -1,0 +1,21 @@
+# ShardingSphere-Proxy global settings: users, mode and properties.
+# Reference: https://shardingsphere.apache.org/document/current/en/user-manual/shardingsphere-proxy/yaml-config/
+
+# Standalone mode: one proxy instance, config from these files.
+mode:
+  type: Standalone
+  repository:
+    type: JDBC
+
+authority:
+  users:
+    - user: admin@%
+      password: change-me
+      admin: true
+    - user: app@%
+      password: change-me-too
+  privilege:
+    type: ALL_PERMITTED
+
+props:
+  sql-show: false

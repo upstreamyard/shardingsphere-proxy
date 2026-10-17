@@ -1,0 +1,199 @@
+name: Build & publish
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # Daily: pick up new ShardingSphere releases automatically.
+    - cron: "27 4 * * *"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "ShardingSphere version to build (e.g. 5.5.3). Empty = latest release."
+        required: false
+        default: ""
+      force:
+        description: "Rebuild even if this version is already published"
+        type: boolean
+        default: false
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ inputs.version }}
+  cancel-in-progress: false
+
+env:
+  IMAGE_NAME: shardingsphere-proxy
+  PLATFORMS: linux/amd64,linux/arm64
+
+permissions:
+  contents: read
+
+jobs:
+  resolve:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      minor: ${{ steps.v.outputs.minor }}
+      is_latest: ${{ steps.v.outputs.is_latest }}
+      build: ${{ steps.v.outputs.build }}
+    steps:
+      - id: v
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          FORCE: ${{ inputs.force }}
+          EVENT: ${{ github.event_name }}
+          GHCR_IMAGE: ghcr.io/${{ github.repository_owner }}/shardingsphere-proxy
+        run: |
+          set -euo pipefail
+          # Apache's download server lists the current release; a git tag can exist before
+          # the release vote has passed, so tags are not used.
+          latest=$(curl -fsSL https://downloads.apache.org/shardingsphere/ \
+            | grep -oE 'href="[0-9]+\.[0-9]+\.[0-9]+/"' | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | sort -V | tail -1)
+          version=${INPUT_VERSION:-$latest}
+          {
+            echo "version=$version"
+            echo "minor=$(echo "$version" | cut -d. -f1-2)"
+            echo "is_latest=$([ "$version" = "$latest" ] && echo true || echo false)"
+          } >> "$GITHUB_OUTPUT"
+
+          build=true
+          # Scheduled runs only build when the version is not published yet.
+          if [ "$EVENT" = "schedule" ] || { [ "$EVENT" = "workflow_dispatch" ] && [ "$FORCE" != "true" ]; }; then
+            if docker buildx imagetools inspect "${GHCR_IMAGE,,}:$version" >/dev/null 2>&1; then
+              echo "$version already published, skipping."
+              build=false
+            fi
+          fi
+          echo "build=$build" >> "$GITHUB_OUTPUT"
+          echo "Latest ShardingSphere release: $latest | building: $version | build: $build"
+
+  build:
+    needs: resolve
+    if: needs.resolve.outputs.build == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write   # push to GHCR
+      id-token: write   # keyless cosign signing
+    env:
+      VERSION: ${{ needs.resolve.outputs.version }}
+      PUBLISH: ${{ github.event_name != 'pull_request' }}
+      DOCKERHUB_ENABLED: ${{ secrets.DOCKERHUB_TOKEN != '' }}
+      QUAY_ENABLED: ${{ secrets.QUAY_TOKEN != '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download and verify ShardingSphere ${{ env.VERSION }}
+        run: scripts/fetch-release.sh "$VERSION"
+
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      # ---------- Smoke test (amd64) before anything is published ----------
+      - name: Build test image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: shardingsphere-proxy:smoke
+          build-args: SHARDINGSPHERE_VERSION=${{ env.VERSION }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Smoke test against MySQL
+        run: scripts/smoke-test.sh shardingsphere-proxy:smoke
+
+      - name: Container logs
+        if: always()
+        run: docker logs ss-smoke 2>&1 | tail -50 || true
+
+      # ---------- Publish ----------
+      - name: Log in to Docker Hub
+        if: env.PUBLISH == 'true' && env.DOCKERHUB_ENABLED == 'true'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Log in to GHCR
+        if: env.PUBLISH == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Log in to Quay.io
+        if: env.PUBLISH == 'true' && env.QUAY_ENABLED == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: quay.io
+          username: ${{ vars.QUAY_USERNAME }}
+          password: ${{ secrets.QUAY_TOKEN }}
+
+      - name: Image names
+        id: images
+        env:
+          OWNER: ${{ github.repository_owner }}
+          DOCKERHUB_NAMESPACE: ${{ vars.DOCKERHUB_NAMESPACE || github.repository_owner }}
+          QUAY_NAMESPACE: ${{ vars.QUAY_NAMESPACE || github.repository_owner }}
+        run: |
+          {
+            echo "list<<EOF"
+            echo "ghcr.io/${OWNER,,}/$IMAGE_NAME"
+            [ "$DOCKERHUB_ENABLED" = "true" ] && echo "docker.io/${DOCKERHUB_NAMESPACE,,}/$IMAGE_NAME"
+            [ "$QUAY_ENABLED" = "true" ] && echo "quay.io/${QUAY_NAMESPACE,,}/$IMAGE_NAME"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.images.outputs.list }}
+          tags: |
+            type=raw,value=${{ env.VERSION }}
+            type=raw,value=${{ needs.resolve.outputs.minor }},enable=${{ needs.resolve.outputs.is_latest }}
+            type=raw,value=latest,enable=${{ needs.resolve.outputs.is_latest }}
+          labels: |
+            org.opencontainers.image.version=${{ env.VERSION }}
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+
+      - name: Build and push (multi-arch)
+        id: push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: ${{ env.PLATFORMS }}
+          push: ${{ env.PUBLISH == 'true' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: SHARDINGSPHERE_VERSION=${{ env.VERSION }}
+          sbom: true
+          provenance: mode=max
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Install cosign
+        if: env.PUBLISH == 'true'
+        uses: sigstore/cosign-installer@v3
+
+      - name: Sign images (keyless)
+        if: env.PUBLISH == 'true'
+        env:
+          DIGEST: ${{ steps.push.outputs.digest }}
+          IMAGES: ${{ steps.images.outputs.list }}
+        run: |
+          for img in $IMAGES; do
+            cosign sign --yes "${img}@${DIGEST}"
+          done
+
+      - name: Sync Docker Hub description
+        if: env.PUBLISH == 'true' && env.DOCKERHUB_ENABLED == 'true' && github.ref == 'refs/heads/main'
+        uses: peter-evans/dockerhub-description@v4
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          repository: ${{ vars.DOCKERHUB_NAMESPACE || github.repository_owner }}/${{ env.IMAGE_NAME }}
+          short-description: "Apache ShardingSphere-Proxy with the MySQL driver included. Non-root, multi-arch, signed, SBOM."
+          readme-filepath: ./README.md

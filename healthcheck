@@ -1,0 +1,3 @@
+#!/bin/bash
+# Healthy when ShardingSphere-Proxy accepts TCP connections on its port.
+exec 3<>"/dev/tcp/127.0.0.1/${PORT:-3307}"
