@@ -9,7 +9,7 @@ ARG JAVA_VERSION=25
 # Prepare: release files and the MySQL driver
 # -----------------------------
 # Only unpacks platform-independent files (jars, scripts), so it runs natively.
-FROM --platform=$BUILDPLATFORM alpine:3.22 AS prepare
+FROM --platform=$BUILDPLATFORM alpine:3.24 AS prepare
 
 # MySQL Connector/J (GPL-2.0 with the Universal FOSS Exception), from Maven Central.
 ARG MYSQL_CONNECTOR_VERSION=26.7.0
