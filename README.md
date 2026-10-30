@@ -2,6 +2,8 @@
 
 # ShardingSphere-Proxy container image
 
+> **Support:** For help with setup, production issues or custom changes, email [upstreamyard@proton.me](mailto:upstreamyard@proton.me).
+
 Multi-arch (`amd64`, `arm64`), signed container images for [Apache ShardingSphere-Proxy](https://github.com/apache/shardingsphere), the database proxy that adds sharding, read/write splitting, encryption and masking in front of MySQL and PostgreSQL. Applications connect to it like to a normal MySQL or PostgreSQL server. **The MySQL JDBC driver is included**, so MySQL and MariaDB backends work without building your own image. Made for Kubernetes and Docker Compose.
 
 > Community-maintained by **upstreamyard**. This is not an official Apache ShardingSphere image. Apache ShardingSphere is licensed under Apache-2.0; the included MySQL Connector/J is © Oracle and licensed under GPL-2.0 with the Universal FOSS Exception (see [Licences](#licences)). Apache, Apache ShardingSphere and ShardingSphere are trademarks of the Apache Software Foundation; MySQL is a trademark of Oracle.
